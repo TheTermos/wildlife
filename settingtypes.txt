@@ -1,0 +1,15 @@
+# This file contains settings of wildlife that can be changed in
+# minetest.conf
+
+#    Chance of spawning a mob when there are no other 
+#    mobs in active_block_range around player
+#    must be float from 0 to 1
+#    1 is always, 0 is never
+wildlife_spawn_chance (Spawn chance) float 0.3
+
+#    Base spawn chance is reduced by this factor
+#    for each mob within active_block_range
+#    must be float from 0 to 1
+#    greater number is greater reduction
+wildlife_spawn_reduction (Spawn chance reduction) float 0.2
+
