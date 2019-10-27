@@ -1,5 +1,7 @@
 local abr = minetest.get_mapgen_setting('active_block_range')
 
+local node_lava = nil
+
 local wildlife = {}
 --wildlife.spawn_rate = 0.5		-- less is more
 
@@ -9,8 +11,22 @@ local max=math.max
 local spawn_rate = 1 - max(min(minetest.settings:get('wildlife_spawn_chance') or 0.2,1),0)
 local spawn_reduction = minetest.settings:get('wildlife_spawn_reduction') or 0.5
 
+local function lava_dmg(self,dmg)
+	node_lava = node_lava or minetest.registered_nodes[minetest.registered_aliases.mapgen_lava_source]
+	if node_lava then
+		local pos=self.object:get_pos()
+		local box = self.object:get_properties().collisionbox
+		local pos1={x=pos.x+box[1],y=pos.y+box[2],z=pos.z+box[3]}
+		local pos2={x=pos.x+box[4],y=pos.y+box[5],z=pos.z+box[6]}
+		local nodes=mobkit.get_nodes_in_area(pos1,pos2)
+		if nodes[node_lava] then mobkit.hurt(self,dmg) end
+	end
+end
+
 local function predator_brain(self)
 	-- vitals should be checked every step
+	if mobkit.timer(self,1) then lava_dmg(self,6) end
+	mobkit.vitals(self)
 --	if self.object:get_hp() <=100 then	
 	if self.hp <= 0 then	
 		mobkit.clear_queue_high(self)									-- cease all activity
@@ -51,8 +67,9 @@ local function predator_brain(self)
 end
 
 local function herbivore_brain(self)
+	if mobkit.timer(self,1) then lava_dmg(self,6) end
+	mobkit.vitals(self)
 
---	if self.object:get_hp() <=100 then	
 	if self.hp <= 0 then	
 		mobkit.clear_queue_high(self)
 		mobkit.hq_die(self)
@@ -232,7 +249,7 @@ minetest.register_entity("wildlife:deer",{
 		},
 	
 	brainfunc = herbivore_brain,
-	
+
 	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
 		local hvel = vector.multiply(vector.normalize({x=dir.x,y=0,z=dir.z}),4)
 		self.object:set_velocity({x=hvel.x,y=2,z=hvel.z})
