@@ -11,6 +11,9 @@ local max=math.max
 local spawn_rate = 1 - max(min(minetest.settings:get('wildlife_spawn_chance') or 0.2,1),0)
 local spawn_reduction = minetest.settings:get('wildlife_spawn_reduction') or 0.5
 
+local hdrops = minetest.get_modpath("water_life")
+
+
 local function lava_dmg(self,dmg)
 	node_lava = node_lava or minetest.registered_nodes[minetest.registered_aliases.mapgen_lava_source]
 	if node_lava then
@@ -29,7 +32,8 @@ local function predator_brain(self)
 	mobkit.vitals(self)
 --	if self.object:get_hp() <=100 then	
 	if self.hp <= 0 then	
-		mobkit.clear_queue_high(self)									-- cease all activity
+		mobkit.clear_queue_high(self)	-- cease all activity
+        if hdrops then water_life.handle_drops(self) end
 		mobkit.hq_die(self)												-- kick the bucket
 		return
 	end
@@ -72,6 +76,7 @@ local function herbivore_brain(self)
 
 	if self.hp <= 0 then	
 		mobkit.clear_queue_high(self)
+        if hdrops then water_life.handle_drops(self) end
 		mobkit.hq_die(self)
 		return
 	end
@@ -193,8 +198,12 @@ minetest.register_entity("wildlife:wolf",{
 	jump_height = 1.26,
 	view_range = 24,
 	lung_capacity = 10, 		-- seconds
-	max_hp = 14,
+	max_hp = 24,
 	timeout=600,
+    drops = {
+		{name = "default:diamond", chance = 20, min = 1, max = 3,},		
+		{name = "water_life:meat_raw", chance = 2, min = 1, max = 2,},
+	},
 	attack={range=0.5,damage_groups={fleshy=7}},
 	sounds = {
 		attack='dogbite',
@@ -240,13 +249,17 @@ minetest.register_entity("wildlife:deer",{
 	jump_height = 1.26,
 	view_range = 24,
 	lung_capacity = 10,			-- seconds
-	max_hp = 10,
+	max_hp = 20,
 	timeout = 600,
 	attack={range=0.5,damage_groups={fleshy=3}},
 	sounds = {
 		scared='deer_scared',
 		hurt = 'deer_hurt',
 		},
+    drops = {
+		{name = "default:diamond", chance = 20, min = 1, max = 3,},		
+		{name = "water_life:meat_raw", chance = 2, min = 1, max = 3,},
+	},
 	
 	brainfunc = herbivore_brain,
 
