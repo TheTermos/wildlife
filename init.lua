@@ -137,7 +137,7 @@ local function spawnstep(dtime)
 			pos2.y=pos2.y-5
 			local height, liquidflag = mobkit.get_terrain_height(pos2,32)
 	
-			if height and height >= 0 and not liquidflag -- and math.abs(height-pos2.y) <= 30 testin
+			if height and height >= 0 and height <= 100 and not liquidflag -- and math.abs(height-pos2.y) <= 30 testin
 			and mobkit.nodeatpos({x=pos2.x,y=height-0.01,z=pos2.z}).is_ground_content then
 
 				local objs = minetest.get_objects_inside_radius(pos,abr*16+5)
