@@ -166,9 +166,11 @@ local function spawnstep(dtime)
 						if obj:is_player() then return end
 					end
 --minetest.chat_send_all('spawnin '.. mobname ..' #deer:' .. dcnt)
-                    if not minetest.is_protected(pos2) then
-                        minetest.add_entity(pos2,mobname)			-- ok spawn it already damnit
-                    end
+                        
+                        if not minetest.is_protected(pos2,mobname) then
+                            minetest.add_entity(pos2,mobname)			-- ok spawn it already damnit
+                        end
+                    
 				end
 			end
 		end
