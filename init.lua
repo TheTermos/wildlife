@@ -13,6 +13,36 @@ local spawn_reduction = minetest.settings:get('wildlife_spawn_reduction') or 0.5
 
 local hdrops = minetest.get_modpath("water_life")
 
+local spawntimer = 0
+
+
+function wildlife.hq_find_food(self,prty,radius)
+    
+    local yaw =  self.object:get_yaw()
+    local pos = mobkit.get_stand_pos(self)
+    local pos1 = {x=pos.x -radius,y=pos.y-1,z=pos.z-radius}
+    local pos2 = {x=pos.x +radius,y=pos.y+1,z=pos.z+radius}  --mobkit.pos_translate2d(pos,yaw,radius)
+    local food = minetest.find_nodes_in_area(pos1,pos2, {"group:flora"})
+    
+    local func = function(self)
+    if #food < 1 then return true end
+    local pos = mobkit.get_stand_pos(self)
+    
+    if mobkit.is_queue_empty_low(self) and self.isonground then
+			
+			if vector.distance(pos,food[1]) > 1 then
+				mobkit.goto_next_waypoint(self,food[1])
+			else
+				self.object:set_velocity({x=0,y=0,z=0})
+                minetest.set_node(food[1],{name="air"})
+                self.hungry = self.hungry + 5
+				return true
+			end
+		end
+	end
+    mobkit.queue_high(self,func,prty)
+end
+    
 
 local function lava_dmg(self,dmg)
 	node_lava = node_lava or minetest.registered_nodes[minetest.registered_aliases.mapgen_lava_source]
@@ -83,9 +113,13 @@ local function herbivore_brain(self)
 	
 	if mobkit.timer(self,1) then 
 		local prty = mobkit.get_queue_priority(self)
+        
+        if not self.hungry then self.hungry = 100 end
+        if mobkit.timer(self,300) then self.hungry = self.hungry - 5 end
 		
 		if prty < 20 and self.isinliquid then
 			mobkit.hq_liquid_recovery(self,20)
+            self.hungry = self.hungry - 10
 			return
 		end
 		
@@ -94,7 +128,8 @@ local function herbivore_brain(self)
 		if prty < 11  then
 			local pred = mobkit.get_closest_entity(self,'wildlife:wolf')
 			if pred then 
-				mobkit.hq_runfrom(self,11,pred) 
+				mobkit.hq_runfrom(self,11,pred)
+                self.hungry = self.hungry -5
 				return
 			end
 		end
@@ -102,11 +137,19 @@ local function herbivore_brain(self)
 			local plyr = mobkit.get_nearby_player(self)
 			if plyr and vector.distance(pos,plyr:get_pos()) < 8 then 
 				mobkit.hq_runfrom(self,10,plyr)
+                self.hungry = self.hungry -5
 				return
 			end
 		end
+        if prty < 5 then
+            if math.random(100) > self.hungry then
+                wildlife.hq_find_food(self,5,5)
+                return
+            end
+        end
 		if mobkit.is_queue_empty_high(self) then
 			mobkit.hq_roam(self,0)
+            self.hungry = self.hungry -2
 		end
 	end
 end
@@ -116,9 +159,13 @@ end
 -- in order for mobs not to spawn on treetops, certain biomes etc.
 
 local function spawnstep(dtime)
+    
+    spawntimer = spawntimer + dtime
+    if spawntimer < 10 then return end
 
 	for _,plyr in ipairs(minetest.get_connected_players()) do
-		if math.random()<dtime*0.2 then	-- each player gets a spawn chance every 5s on average
+            
+            spawntimer = 0
 			local vel = plyr:get_player_velocity()
 			local spd = vector.length(vel)
 			local chance = spawn_rate * 1/(spd*0.75+1)  -- chance is quadrupled for speed=4
@@ -173,7 +220,7 @@ local function spawnstep(dtime)
                     
 				end
 			end
-		end
+		
 	end
 end
 
@@ -254,6 +301,7 @@ minetest.register_entity("wildlife:deer",{
 	view_range = 24,
 	lung_capacity = 10,			-- seconds
 	max_hp = 20,
+    hungry = 100,
 	timeout = 600,
 	attack={range=0.5,damage_groups={fleshy=3}},
 	sounds = {
@@ -275,16 +323,3 @@ minetest.register_entity("wildlife:deer",{
 	end,
 })
 
-
--- minetest.register_on_chat_message(
-	-- function(name, message)
-		-- if message == 'doit' then
-			-- local plyr=minetest.get_player_by_name(name)
-			-- local pos=mobkit.get_stand_pos(plyr)
-			-- local nodes = mobkit.get_nodes_in_area(pos,mobkit.pos_shift(pos,{x=-1,z=-1,y=-1}))
-			-- for p,n in pairs(nodes) do
-				-- minetest.chat_send_all(p.name ..' '.. dump(n))
-			-- end
-		-- end
-	-- end
--- )
