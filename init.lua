@@ -80,7 +80,9 @@ local function predator_brain(self)
 		
 		-- hunt
 		if prty < 10 then							-- if not busy with anything important
-			local prey = mobkit.get_closest_entity(self,'wildlife:deer')	-- look for prey
+			local prey = mobkit.get_closest_entity(self,'aerotest:eagle')-- look for prey
+			--if prey and prey.action ~= "idle" then prey = nil end
+			if not prey then mobkit.get_closest_entity(self,'wildlife:deer') end
 			if prey then 
 				mobkit.hq_hunt(self,10,prey) 									-- and chase it
 			end
