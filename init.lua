@@ -1,5 +1,5 @@
 local abr = minetest.get_mapgen_setting('active_block_range')
-
+local abs = math.abs
 local node_lava = nil
 
 local wildlife = {}
@@ -16,25 +16,82 @@ local hdrops = minetest.get_modpath("water_life")
 local spawntimer = 0
 
 
+local function sortout(self,ftable)
+	if not ftable or #ftable < 1 then return ftable end
+	local pos = mobkit.get_stand_pos(self)
+	pos.y = pos.y + 0.5
+	
+	for i = #ftable,1,-1 do
+		if water_life.find_collision(pos,ftable[i],true) then 
+			table.remove(ftable,i)
+		end
+	end
+	return ftable
+end
+		
+
+function wildlife.hq_goto(self,prty,tpos)
+	local func = function(self)
+		if mobkit.is_queue_empty_low(self) and self.isonground then
+			local pos = mobkit.get_stand_pos(self)
+			if vector.distance(pos,tpos) > 1 then
+				wildlife.goto_next_waypoint(self,tpos,0.5)
+			else
+				return true
+			end
+		end
+	end
+	mobkit.queue_high(self,func,prty)
+end
+
+
+function wildlife.goto_next_waypoint(self,tpos,speedfactor)
+	local height, pos2 = mobkit.get_next_waypoint(self,tpos)
+	if not speedfactor then speedfactor = 1 end
+	
+	if not height then return false end
+	
+	if height <= 0.01 then
+		local yaw = self.object:get_yaw()
+		local tyaw = minetest.dir_to_yaw(vector.direction(self.object:get_pos(),pos2))
+		if abs(tyaw-yaw) > 1 then
+			mobkit.lq_turn2pos(self,pos2) 
+		end
+		mobkit.lq_dumbwalk(self,pos2,speedfactor)
+	else
+		mobkit.lq_turn2pos(self,pos2) 
+		mobkit.lq_dumbjump(self,height) 
+	end
+	return true
+end
+
+
 function wildlife.hq_find_food(self,prty,radius)
     
     local yaw =  self.object:get_yaw()
     local pos = mobkit.get_stand_pos(self)
     local pos1 = {x=pos.x -radius,y=pos.y-1,z=pos.z-radius}
     local pos2 = {x=pos.x +radius,y=pos.y+1,z=pos.z+radius}  --mobkit.pos_translate2d(pos,yaw,radius)
-    local food = minetest.find_nodes_in_area(pos1,pos2, {"group:flora"})
+	local food = minetest.find_nodes_in_area(pos1,pos2, {"group:growing","group:plant"})
+    if not food or #food < 1 then food = minetest.find_nodes_in_area(pos1,pos2, {"group:flora"}) end
+	food = sortout(self,food)
+	if #food < 1 then return true end
+	--minetest.chat_send_all("### "..dump(#food).." ###")
+	local snack = food[math.random(#food)]
     
+	
     local func = function(self)
-    if #food < 1 then return true end
     local pos = mobkit.get_stand_pos(self)
+	--water_life.temp_show(snack,10)
+	
     
     if mobkit.is_queue_empty_low(self) and self.isonground then
 			
-			if vector.distance(pos,food[1]) > 1 then
-				mobkit.goto_next_waypoint(self,food[1])
+			if vector.distance(pos,snack) > 1 then
+				wildlife.hq_goto(self,prty+1,snack)
 			else
 				self.object:set_velocity({x=0,y=0,z=0})
-                minetest.set_node(food[1],{name="air"})
+                minetest.set_node(snack,{name="air"})
                 self.hungry = self.hungry + 5
 				return true
 			end
@@ -81,7 +138,6 @@ local function predator_brain(self)
 		-- hunt
 		if prty < 10 then							-- if not busy with anything important
 			local prey = mobkit.get_closest_entity(self,'aerotest:eagle')-- look for prey
-			--if prey and prey.action ~= "idle" then prey = nil end
 			if not prey then mobkit.get_closest_entity(self,'wildlife:deer') end
 			if prey then 
 				mobkit.hq_hunt(self,10,prey) 									-- and chase it
@@ -103,6 +159,7 @@ local function predator_brain(self)
 end
 
 local function herbivore_brain(self)
+	if self.tamed == nil then self.tamed = false end
 	if mobkit.timer(self,1) then lava_dmg(self,6) end
 	mobkit.vitals(self)
 
@@ -113,11 +170,16 @@ local function herbivore_brain(self)
 		return
 	end
 	
+	if mobkit.timer(self,10) and self.hungry then
+		if self.hungry < 10 then mobkit.hurt(self,1) end
+	end
+	
 	if mobkit.timer(self,1) then 
 		local prty = mobkit.get_queue_priority(self)
         
         if not self.hungry then self.hungry = 100 end
-        if mobkit.timer(self,300) then self.hungry = self.hungry - 5 end
+        if mobkit.timer(self,300) then self.hungry = self.hungry - 10 end
+		
 		
 		if prty < 20 and self.isinliquid then
 			mobkit.hq_liquid_recovery(self,20)
@@ -137,7 +199,7 @@ local function herbivore_brain(self)
 		end
 		if prty < 10 then
 			local plyr = mobkit.get_nearby_player(self)
-			if plyr and vector.distance(pos,plyr:get_pos()) < 8 then 
+			if plyr and vector.distance(pos,plyr:get_pos()) < 8 and not self.tamed then 
 				mobkit.hq_runfrom(self,10,plyr)
                 self.hungry = self.hungry -5
 				return
@@ -151,7 +213,7 @@ local function herbivore_brain(self)
         end
 		if mobkit.is_queue_empty_high(self) then
 			mobkit.hq_roam(self,0)
-            self.hungry = self.hungry -2
+            self.hungry = self.hungry -5
 		end
 	end
 end
@@ -301,9 +363,10 @@ minetest.register_entity("wildlife:deer",{
 	max_speed = 5,
 	jump_height = 1.26,
 	view_range = 24,
-	lung_capacity = 10,			-- seconds
+	lung_capacity = 20,			-- seconds
 	max_hp = 20,
     hungry = 100,
+	tamed = false,
 	timeout = 600,
 	attack={range=0.5,damage_groups={fleshy=3}},
 	sounds = {
@@ -323,5 +386,116 @@ minetest.register_entity("wildlife:deer",{
 		mobkit.make_sound(self,'hurt')
 		mobkit.hurt(self,tool_capabilities.damage_groups.fleshy or 1)
 	end,
+	
+	on_rightclick = function(self, clicker)
+        if not clicker or not clicker:is_player() then return end
+        local inv = clicker:get_inventory()
+        local item = clicker:get_wielded_item()
+        
+        if not item or item:get_name() ~= "water_life:lasso" then return end
+        if not inv:room_for_item("main", "wildlife:deer_item") then return end
+        local pos = mobkit.get_stand_pos(self)
+		local name = clicker:get_player_name()
+		local hasowner = minetest.is_protected(pos)
+        if hasowner and self.tamed then return end
+                                            
+        inv:add_item("main", "wildlife:deer_item")
+        self.object:remove()
+    end,
 })
 
+
+
+minetest.register_entity("wildlife:deer_tamed",{
+											-- common props
+	physical = true,
+	stepheight = 0.1,				--EVIL!
+	collide_with_objects = true,
+	collisionbox = {-0.35, -0.19, -0.35, 0.35, 0.65, 0.35},
+	visual = "mesh",
+	mesh = "herbivore.b3d",
+	textures = {"herbivore.png"},
+	visual_size = {x = 1.3, y = 1.3},
+	static_save = true,
+	makes_footstep_sound = true,
+	on_step = mobkit.stepfunc,	-- required
+	on_activate = mobkit.actfunc,		-- required
+	get_staticdata = mobkit.statfunc,
+											-- api props
+	springiness=0,
+	buoyancy = 0.9,
+	max_speed = 5,
+	jump_height = 1.26,
+	view_range = 24,
+	lung_capacity = 20,			-- seconds
+	max_hp = 20,
+    hungry = 100,
+	tamed = true,
+	timeout = 600,
+	attack={range=0.5,damage_groups={fleshy=3}},
+	sounds = {
+		scared='deer_scared',
+		hurt = 'deer_hurt',
+		},
+    drops = {
+		{name = "water_life:meat_raw", chance = 2, min = 1, max = 3,},
+	},
+	
+	brainfunc = herbivore_brain,
+
+	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
+		local pos = mobkit.get_stand_pos(self)
+		if minetest.is_protected(pos) then return end
+                                                
+		local hvel = vector.multiply(vector.normalize({x=dir.x,y=0,z=dir.z}),4)
+		self.object:set_velocity({x=hvel.x,y=2,z=hvel.z})
+		mobkit.make_sound(self,'hurt')
+		mobkit.hurt(self,tool_capabilities.damage_groups.fleshy or 1)
+	end,
+                                                
+	on_rightclick = function(self, clicker)
+        if not clicker or not clicker:is_player() then return end
+        local inv = clicker:get_inventory()
+        local item = clicker:get_wielded_item()
+        
+        if not item or item:get_name() ~= "water_life:lasso" then return end
+        if not inv:room_for_item("main", "wildlife:deer_item") then return end
+        local pos = mobkit.get_stand_pos(self)
+		local name = clicker:get_player_name()
+		local hasowner = minetest.is_protected(pos,name)
+        if  hasowner and self.tamed then return end
+                                            
+        inv:add_item("main", "wildlife:deer_item")
+        self.object:remove()
+    end,
+})
+
+
+minetest.register_craftitem("wildlife:deer_item", {
+	description = ("a tamed Deer"),
+	inventory_image = "herbivore_item.png",
+    wield_scale = {x = 0.5, y = 0.5, z = 0.5},
+    stack_max = 10,
+    liquids_pointable = false,
+    range = 10,
+    on_use = minetest.item_eat(5),                                    
+	groups = {food_meat = 1, flammable = 2},
+    on_place = function(itemstack, placer, pointed_thing)
+        if placer and not placer:is_player() then return itemstack end
+        if not pointed_thing then return itemstack end
+        if not pointed_thing.type == "node" then return itemstack end
+        
+        local pos = pointed_thing.above
+        local number = water_life.count_objects(pos,nil,"wildlife:deer")
+        if number.all > water_life.maxmobs or number.name > 10 then return itemstack end
+                                                    
+        local name = placer:get_player_name()
+        if minetest.is_protected(pos,name) then return itemstack end
+
+        local obj = minetest.add_entity(pos, "wildlife:deer_tamed")
+        obj = obj:get_luaentity()
+		obj.tamed = true
+        itemstack:take_item()
+        return itemstack
+    end,
+})
