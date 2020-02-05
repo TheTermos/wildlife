@@ -1,9 +1,10 @@
 local abr = minetest.get_mapgen_setting('active_block_range')
 local abs = math.abs
 local node_lava = nil
+local random = water_life.random
 
 local wildlife = {}
---wildlife.spawn_rate = 0.5		-- less is more
+wildlife.spawn_rate = 0.5		-- less is more
 
 local min=math.min
 local max=math.max
@@ -77,8 +78,7 @@ function wildlife.hq_find_food(self,prty,radius)
 	food = sortout(self,food)
 	if #food < 1 then return true end
 	--minetest.chat_send_all("### "..dump(#food).." ###")
-	local snack = food[math.random(#food)]
-    
+	local snack = food[random(#food)]
 	
     local func = function(self)
     local pos = mobkit.get_stand_pos(self)
@@ -206,7 +206,7 @@ local function herbivore_brain(self)
 			end
 		end
         if prty < 5 then
-            if math.random(100) > self.hungry then
+            if random(100) > self.hungry then
                 wildlife.hq_find_food(self,5,5)
                 return
             end
@@ -237,10 +237,10 @@ local function spawnstep(dtime)
 			local yaw
 			if spd > 1 then
 				-- spawn in the front arc
-				yaw = plyr:get_look_horizontal() + math.random()*0.35 - 0.75
+				yaw = plyr:get_look_horizontal() + random()*0.35 - 0.75
 			else
 				-- random yaw
-				yaw = math.random()*math.pi*2 - math.pi
+				yaw = random()*math.pi*2 - math.pi
 			end
 			local pos = plyr:get_pos()
 			local dir = vector.multiply(minetest.yaw_to_dir(yaw),abr*16)
@@ -265,7 +265,7 @@ local function spawnstep(dtime)
 					end
 				end
 --minetest.chat_send_all('chance '.. chance)
-				if chance < math.random() then
+				if chance < random() then
 
 					-- if no wolves and at least one deer spawn wolf, else deer
 --					local mobname = (wcnt==0 and dcnt > 0) and 'wildlife:wolf' or 'wildlife:deer'
@@ -431,7 +431,7 @@ minetest.register_entity("wildlife:deer_tamed",{
 	max_hp = 20,
     hungry = 100,
 	tamed = true,
-	timeout = 600,
+--	timeout = 600,
 	attack={range=0.5,damage_groups={fleshy=3}},
 	sounds = {
 		scared='deer_scared',
@@ -450,6 +450,7 @@ minetest.register_entity("wildlife:deer_tamed",{
 		local hvel = vector.multiply(vector.normalize({x=dir.x,y=0,z=dir.z}),4)
 		self.object:set_velocity({x=hvel.x,y=2,z=hvel.z})
 		mobkit.make_sound(self,'hurt')
+		self.tamed = false
 		mobkit.hurt(self,tool_capabilities.damage_groups.fleshy or 1)
 	end,
                                                 
