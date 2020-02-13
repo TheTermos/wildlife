@@ -20,7 +20,6 @@ minetest.after(0, function()
 			table.insert(dps_nodes_names, name)
 		end
 	end
-	minetest.debug(dump(dps_nodes_names))
 end)
 
 local function node_dps_dmg(self)
