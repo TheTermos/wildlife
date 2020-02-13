@@ -15,11 +15,12 @@ local dps_nodes_names = {}
 -- that can deliver damage per second
 minetest.after(0, function()
 	for name, def in pairs(minetest.registered_nodes) do
-		if def.damage_per_second and def.damage_per_second > 0 then
+		if def.damage_per_second and def.damage_per_second ~= 0 then
 			dps_nodes_damage[name] = def.damage_per_second
 			table.insert(dps_nodes_names, name)
 		end
 	end
+	minetest.debug(dump(dps_nodes_names))
 end)
 
 local function node_dps_dmg(self)
