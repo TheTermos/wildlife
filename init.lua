@@ -9,19 +9,6 @@ local max=math.max
 local spawn_rate = 1 - max(min(minetest.settings:get('wildlife_spawn_chance') or 0.2,1),0)
 local spawn_reduction = minetest.settings:get('wildlife_spawn_reduction') or 0.5
 
-local dps_nodes_damage = {}
-local dps_nodes_names = {}
--- After all mods are loaded and the world has been initialized, find all nodes
--- that can deliver damage per second
-minetest.after(0, function()
-	for name, def in pairs(minetest.registered_nodes) do
-		if def.damage_per_second and def.damage_per_second ~= 0 then
-			dps_nodes_damage[name] = def.damage_per_second
-			table.insert(dps_nodes_names, name)
-		end
-	end
-end)
-
 local function node_dps_dmg(self)
 	local pos = self.object:get_pos()
 	local box = self.object:get_properties().collisionbox
