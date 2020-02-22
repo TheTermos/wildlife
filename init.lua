@@ -1,7 +1,5 @@
 local abr = minetest.get_mapgen_setting('active_block_range')
 
-local node_lava = nil
-
 local wildlife = {}
 --wildlife.spawn_rate = 0.5		-- less is more
 
@@ -11,21 +9,29 @@ local max=math.max
 local spawn_rate = 1 - max(min(minetest.settings:get('wildlife_spawn_chance') or 0.2,1),0)
 local spawn_reduction = minetest.settings:get('wildlife_spawn_reduction') or 0.5
 
-local function lava_dmg(self,dmg)
-	node_lava = node_lava or minetest.registered_nodes[minetest.registered_aliases.mapgen_lava_source]
-	if node_lava then
-		local pos=self.object:get_pos()
-		local box = self.object:get_properties().collisionbox
-		local pos1={x=pos.x+box[1],y=pos.y+box[2],z=pos.z+box[3]}
-		local pos2={x=pos.x+box[4],y=pos.y+box[5],z=pos.z+box[6]}
-		local nodes=mobkit.get_nodes_in_area(pos1,pos2)
-		if nodes[node_lava] then mobkit.hurt(self,dmg) end
+local function node_dps_dmg(self)
+	local pos = self.object:get_pos()
+	local box = self.object:get_properties().collisionbox
+	local pos1 = {x = pos.x + box[1], y = pos.y + box[2], z = pos.z + box[3]}
+	local pos2 = {x = pos.x + box[4], y = pos.y + box[5], z = pos.z + box[6]}
+	local nodes_overlap = mobkit.get_nodes_in_area(pos1, pos2)
+	local total_damage = 0
+
+	for node_def, _ in pairs(nodes_overlap) do
+		local dps = node_def.damage_per_second
+		if dps then
+			total_damage = math.max(total_damage, dps)
+		end
+	end
+
+	if total_damage ~= 0 then
+		mobkit.hurt(self, total_damage)
 	end
 end
 
 local function predator_brain(self)
 	-- vitals should be checked every step
-	if mobkit.timer(self,1) then lava_dmg(self,6) end
+	if mobkit.timer(self,1) then node_dps_dmg(self) end
 	mobkit.vitals(self)
 --	if self.object:get_hp() <=100 then	
 	if self.hp <= 0 then	
@@ -67,7 +73,7 @@ local function predator_brain(self)
 end
 
 local function herbivore_brain(self)
-	if mobkit.timer(self,1) then lava_dmg(self,6) end
+	if mobkit.timer(self,1) then node_dps_dmg(self) end
 	mobkit.vitals(self)
 
 	if self.hp <= 0 then	
